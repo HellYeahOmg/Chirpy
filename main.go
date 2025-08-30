@@ -32,19 +32,19 @@ func main() {
 
 	sm.Handle("/app/", config.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir("./")))))
 	sm.Handle("/app/assets", http.StripPrefix("/app/assets", http.FileServer(http.Dir("./assets/"))))
-	sm.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+	sm.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		s := fmt.Sprintf("Hits: %v", config.fileserverHits.Load())
 		w.Write([]byte(s))
 	})
 
-	sm.HandleFunc("/reset", func(w http.ResponseWriter, r *http.Request) {
+	sm.HandleFunc("POST /reset", func(w http.ResponseWriter, r *http.Request) {
 		config.resetMetricsInc()
 		w.Write([]byte("OK"))
 	})
 
-	sm.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	sm.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
