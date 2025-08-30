@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sync/atomic"
 )
@@ -54,6 +56,76 @@ func main() {
 		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
+	})
+
+	sm.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
+
+		type parameters struct {
+			Body string `json:"body"`
+		}
+
+		type errorReturnValues struct {
+			Error string `json:"valid"`
+		}
+
+		params := parameters{}
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&params)
+		if err != nil {
+			log.Printf("Error decoding parameters: %s", err)
+			w.WriteHeader(500)
+			responseBody := errorReturnValues{
+				Error: "Something went wrong",
+			}
+
+			dat, err := json.Marshal(responseBody)
+			if err != nil {
+				w.WriteHeader(500)
+				log.Printf("Error marshalling JSON: %s", err)
+				return
+			}
+
+			w.Write(dat)
+			return
+		}
+
+		fmt.Println(len(params.Body))
+
+		if len(params.Body) > 140 {
+			w.WriteHeader(400)
+			responseBody := errorReturnValues{
+				Error: "Chirp is too long",
+			}
+
+			dat, err := json.Marshal(responseBody)
+			if err != nil {
+				w.WriteHeader(500)
+				log.Printf("Error marshalling JSON: %s", err)
+				return
+			}
+
+			w.Write(dat)
+			return
+		}
+
+		type returnValues struct {
+			Valid bool `json:"valid"`
+		}
+
+		responseBody := returnValues{
+			Valid: true,
+		}
+
+		dat, err := json.Marshal(responseBody)
+		if err != nil {
+			log.Printf("Error marshalling JSON: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		w.WriteHeader(200)
+		w.Write(dat)
 	})
 
 	s.ListenAndServe()
