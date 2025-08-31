@@ -241,5 +241,40 @@ func main() {
 		w.WriteHeader(200)
 	})
 
+	sm.HandleFunc("GET /api/chirps/{chirpId}", func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("chirpId")
+		parsedID, err := uuid.Parse(id)
+		if err != nil {
+			log.Printf("failed to parse chirp id: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		row, err := dbQueries.GetChirp(r.Context(), parsedID)
+		if err != nil {
+			log.Printf("failed to find a chirp: %s", err)
+			w.WriteHeader(404)
+			return
+		}
+
+		chirp := Chirp{
+			ID:        row.ID,
+			CreatedAt: row.CreatedAt,
+			UpdatedAt: row.UpdatedAt,
+			UserID:    row.UserID,
+			Body:      row.Body,
+		}
+
+		data, err := json.Marshal(chirp)
+		if err != nil {
+			fmt.Printf("failed to marshal chirp: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		w.WriteHeader(200)
+		w.Write(data)
+	})
+
 	s.ListenAndServe()
 }
