@@ -110,11 +110,11 @@ func main() {
 		}
 
 		type returnValues struct {
-			Valid bool `json:"valid"`
+			CleanedBody string `json:"cleaned_body"`
 		}
 
 		responseBody := returnValues{
-			Valid: true,
+			CleanedBody: filterProfaneWords(params.Body),
 		}
 
 		dat, err := json.Marshal(responseBody)
