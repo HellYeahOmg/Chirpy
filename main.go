@@ -209,5 +209,37 @@ func main() {
 		w.Write(data)
 	})
 
+	sm.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) {
+		result := []Chirp{}
+
+		rows, err := dbQueries.GetChirps(r.Context())
+		if err != nil {
+			log.Printf("failed to get chirps: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		for _, item := range rows {
+			jsonItem := Chirp{
+				ID:        item.ID,
+				CreatedAt: item.CreatedAt,
+				UpdatedAt: item.UpdatedAt,
+				Body:      item.Body,
+				UserID:    item.UserID,
+			}
+			result = append(result, jsonItem)
+		}
+
+		data, err := json.Marshal(result)
+		if err != nil {
+			log.Printf("failed to marshal chirps: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		w.Write(data)
+		w.WriteHeader(200)
+	})
+
 	s.ListenAndServe()
 }
