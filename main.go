@@ -1,5 +1,7 @@
 package main
 
+// postgres://vadimdemidov:@localhost:5432/chirpy
+
 import (
 	"encoding/json"
 	"fmt"
