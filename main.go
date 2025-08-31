@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"os"
 	"sync/atomic"
+	"time"
 
 	"github.com/HellYeahOmg/Chirpy/internal/database"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -74,76 +76,6 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
-	sm.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
-
-		type parameters struct {
-			Body string `json:"body"`
-		}
-
-		type errorReturnValues struct {
-			Error string `json:"valid"`
-		}
-
-		params := parameters{}
-		decoder := json.NewDecoder(r.Body)
-		err := decoder.Decode(&params)
-		if err != nil {
-			log.Printf("Error decoding parameters: %s", err)
-			w.WriteHeader(500)
-			responseBody := errorReturnValues{
-				Error: "Something went wrong",
-			}
-
-			dat, err := json.Marshal(responseBody)
-			if err != nil {
-				w.WriteHeader(500)
-				log.Printf("Error marshalling JSON: %s", err)
-				return
-			}
-
-			w.Write(dat)
-			return
-		}
-
-		fmt.Println(len(params.Body))
-
-		if len(params.Body) > 140 {
-			w.WriteHeader(400)
-			responseBody := errorReturnValues{
-				Error: "Chirp is too long",
-			}
-
-			dat, err := json.Marshal(responseBody)
-			if err != nil {
-				w.WriteHeader(500)
-				log.Printf("Error marshalling JSON: %s", err)
-				return
-			}
-
-			w.Write(dat)
-			return
-		}
-
-		type returnValues struct {
-			CleanedBody string `json:"cleaned_body"`
-		}
-
-		responseBody := returnValues{
-			CleanedBody: filterProfaneWords(params.Body),
-		}
-
-		dat, err := json.Marshal(responseBody)
-		if err != nil {
-			log.Printf("Error marshalling JSON: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		w.WriteHeader(200)
-		w.Write(dat)
-	})
-
 	sm.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) {
 		type parameters struct {
 			Email string `json:"email"`
@@ -182,6 +114,95 @@ func main() {
 		data, err := json.Marshal(responseBody)
 		if err != nil {
 			log.Printf("failed to marshal responseBody: %s", err)
+		}
+
+		w.WriteHeader(201)
+		w.Write(data)
+	})
+
+	sm.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
+		type parameters struct {
+			Body   string `json:"body"`
+			UserID string `json:"user_id"`
+		}
+
+		type errorReturnValues struct {
+			Error string `json:"valid"`
+		}
+
+		params := parameters{}
+		decoder := json.NewDecoder(r.Body)
+		err := decoder.Decode(&params)
+		if err != nil {
+			log.Printf("Error decoding parameters: %s", err)
+			w.WriteHeader(500)
+			responseBody := errorReturnValues{
+				Error: "Something went wrong",
+			}
+
+			dat, err := json.Marshal(responseBody)
+			if err != nil {
+				w.WriteHeader(500)
+				log.Printf("Error marshalling JSON: %s", err)
+				return
+			}
+
+			w.Write(dat)
+			return
+		}
+
+		if len(params.Body) > 140 {
+			w.WriteHeader(400)
+			responseBody := errorReturnValues{
+				Error: "Chirp is too long",
+			}
+
+			dat, err := json.Marshal(responseBody)
+			if err != nil {
+				w.WriteHeader(500)
+				log.Printf("Error marshalling JSON: %s", err)
+				return
+			}
+
+			w.Write(dat)
+			return
+		}
+
+		parsedID, err := uuid.Parse(params.UserID)
+		if err != nil {
+			log.Printf("failed to parse user_id: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		newChirp := database.CreateChirpParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Body:      params.Body,
+			UserID:    parsedID,
+		}
+
+		result, err := dbQueries.CreateChirp(r.Context(), newChirp)
+		if err != nil {
+			log.Printf("failed to create a new chirp: %s", err)
+			w.WriteHeader(500)
+			return
+		}
+
+		responseBody := Chirp{
+			ID:        result.ID,
+			UpdatedAt: result.UpdatedAt,
+			CreatedAt: result.CreatedAt,
+			Body:      result.Body,
+			UserID:    result.UserID,
+		}
+
+		data, err := json.Marshal(responseBody)
+		if err != nil {
+			log.Printf("failed to marshal chirp: %s", err)
+			w.WriteHeader(500)
+			return
 		}
 
 		w.WriteHeader(201)
