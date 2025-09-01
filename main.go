@@ -2,34 +2,15 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"sync/atomic"
-	"time"
 
 	"github.com/HellYeahOmg/Chirpy/internal/database"
-	"github.com/google/uuid"
+	"github.com/HellYeahOmg/Chirpy/internal/handlers"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
-
-type apiConfig struct {
-	fileserverHits atomic.Int32
-}
-
-func (cfg *apiConfig) resetMetricsInc() {
-	cfg.fileserverHits.Store(0)
-}
-
-func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cfg.fileserverHits.Add(1)
-		next.ServeHTTP(w, r)
-	})
-}
 
 func main() {
 	godotenv.Load(".env")
@@ -43,238 +24,30 @@ func main() {
 	dbQueries := database.New(db)
 
 	sm := http.NewServeMux()
-	config := apiConfig{}
+	config := handlers.ApiConfig{}
 
 	s := http.Server{
 		Handler: sm,
 		Addr:    ":8080",
 	}
 
-	sm.Handle("/app/", config.middlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir("./")))))
+	sm.Handle("/app/", config.MiddlewareMetricsInc(http.StripPrefix("/app/", http.FileServer(http.Dir("./")))))
 	sm.Handle("/app/assets", http.StripPrefix("/app/assets", http.FileServer(http.Dir("./assets/"))))
 
-	sm.HandleFunc("GET /admin/metrics", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		s := fmt.Sprintf(`<html>
-  <body>
-    <h1>Welcome, Chirpy Admin</h1>
-    <p>Chirpy has been visited %d times!</p>
-  </body>
-</html>`, config.fileserverHits.Load())
-		w.Write([]byte(s))
-	})
+	sm.HandleFunc("GET /admin/metrics", config.HandleMetrics)
+	sm.HandleFunc("POST /admin/reset", config.HandleReset)
 
-	sm.HandleFunc("POST /admin/reset", func(w http.ResponseWriter, r *http.Request) {
-		config.resetMetricsInc()
-		w.Write([]byte("OK"))
-	})
+	sm.HandleFunc("GET /api/healthz", handlers.HandleHealthz)
 
-	sm.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
+	sm.HandleFunc("POST /api/users", handlers.HandleCreateUser(dbQueries))
 
-	sm.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) {
-		type parameters struct {
-			Email string `json:"email"`
-		}
+	sm.HandleFunc("POST /api/chirps", handlers.HandleCreateChirp(dbQueries))
 
-		type response struct {
-			ID        string `json:"id"`
-			CreatedAt string `json:"created_at"`
-			UpdatedAt string `json:"updated_at"`
-			Email     string `json:"email"`
-		}
+	sm.HandleFunc("GET /api/chirps", handlers.HandleGetChirps(dbQueries))
 
-		params := parameters{}
-		decoder := json.NewDecoder(r.Body)
-		err := decoder.Decode(&params)
-		if err != nil {
-			log.Printf("failed to decoded request body: %s\n", err)
-			w.WriteHeader(500)
-			return
-		}
+	sm.HandleFunc("GET /api/chirps/{chirpId}", handlers.HandleGetChirp(dbQueries))
 
-		dbUser, err := dbQueries.CreateUser(r.Context(), params.Email)
-		if err != nil {
-			log.Printf("failed to create a new user: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		responseBody := User{
-			ID:        dbUser.ID,
-			CreatedAt: dbUser.CreatedAt,
-			UpdatedAt: dbUser.UpdatedAt,
-			Email:     dbUser.Email,
-		}
-
-		data, err := json.Marshal(responseBody)
-		if err != nil {
-			log.Printf("failed to marshal responseBody: %s", err)
-		}
-
-		w.WriteHeader(201)
-		w.Write(data)
-	})
-
-	sm.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
-		type parameters struct {
-			Body   string `json:"body"`
-			UserID string `json:"user_id"`
-		}
-
-		type errorReturnValues struct {
-			Error string `json:"valid"`
-		}
-
-		params := parameters{}
-		decoder := json.NewDecoder(r.Body)
-		err := decoder.Decode(&params)
-		if err != nil {
-			log.Printf("Error decoding parameters: %s", err)
-			w.WriteHeader(500)
-			responseBody := errorReturnValues{
-				Error: "Something went wrong",
-			}
-
-			dat, err := json.Marshal(responseBody)
-			if err != nil {
-				w.WriteHeader(500)
-				log.Printf("Error marshalling JSON: %s", err)
-				return
-			}
-
-			w.Write(dat)
-			return
-		}
-
-		if len(params.Body) > 140 {
-			w.WriteHeader(400)
-			responseBody := errorReturnValues{
-				Error: "Chirp is too long",
-			}
-
-			dat, err := json.Marshal(responseBody)
-			if err != nil {
-				w.WriteHeader(500)
-				log.Printf("Error marshalling JSON: %s", err)
-				return
-			}
-
-			w.Write(dat)
-			return
-		}
-
-		parsedID, err := uuid.Parse(params.UserID)
-		if err != nil {
-			log.Printf("failed to parse user_id: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		newChirp := database.CreateChirpParams{
-			ID:        uuid.New(),
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-			Body:      params.Body,
-			UserID:    parsedID,
-		}
-
-		result, err := dbQueries.CreateChirp(r.Context(), newChirp)
-		if err != nil {
-			log.Printf("failed to create a new chirp: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		responseBody := Chirp{
-			ID:        result.ID,
-			UpdatedAt: result.UpdatedAt,
-			CreatedAt: result.CreatedAt,
-			Body:      result.Body,
-			UserID:    result.UserID,
-		}
-
-		data, err := json.Marshal(responseBody)
-		if err != nil {
-			log.Printf("failed to marshal chirp: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		w.WriteHeader(201)
-		w.Write(data)
-	})
-
-	sm.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) {
-		result := []Chirp{}
-
-		rows, err := dbQueries.GetChirps(r.Context())
-		if err != nil {
-			log.Printf("failed to get chirps: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		for _, item := range rows {
-			jsonItem := Chirp{
-				ID:        item.ID,
-				CreatedAt: item.CreatedAt,
-				UpdatedAt: item.UpdatedAt,
-				Body:      item.Body,
-				UserID:    item.UserID,
-			}
-			result = append(result, jsonItem)
-		}
-
-		data, err := json.Marshal(result)
-		if err != nil {
-			log.Printf("failed to marshal chirps: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		w.Write(data)
-		w.WriteHeader(200)
-	})
-
-	sm.HandleFunc("GET /api/chirps/{chirpId}", func(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("chirpId")
-		parsedID, err := uuid.Parse(id)
-		if err != nil {
-			log.Printf("failed to parse chirp id: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		row, err := dbQueries.GetChirp(r.Context(), parsedID)
-		if err != nil {
-			log.Printf("failed to find a chirp: %s", err)
-			w.WriteHeader(404)
-			return
-		}
-
-		chirp := Chirp{
-			ID:        row.ID,
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
-			UserID:    row.UserID,
-			Body:      row.Body,
-		}
-
-		data, err := json.Marshal(chirp)
-		if err != nil {
-			fmt.Printf("failed to marshal chirp: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		w.WriteHeader(200)
-		w.Write(data)
-	})
+	sm.HandleFunc("POST /api/login", handlers.HandleLogin(dbQueries))
 
 	s.ListenAndServe()
 }
