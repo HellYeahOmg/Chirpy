@@ -9,8 +9,7 @@ import (
 	"github.com/HellYeahOmg/Chirpy/internal/database"
 )
 
-func HandleCreateUser(dbQueries *database.Queries) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 		type parameters struct {
 			Email    string `json:"email"`
 			Password string `json:"password"`
@@ -44,7 +43,7 @@ func HandleCreateUser(dbQueries *database.Queries) http.HandlerFunc {
 			HashedPassword: hash,
 		}
 
-		dbUser, err := dbQueries.CreateUser(r.Context(), queryParams)
+		dbUser, err := cfg.DB.CreateUser(r.Context(), queryParams)
 		if err != nil {
 			log.Printf("failed to create a new user: %s", err)
 			w.WriteHeader(500)
@@ -65,5 +64,4 @@ func HandleCreateUser(dbQueries *database.Queries) http.HandlerFunc {
 
 		w.WriteHeader(201)
 		w.Write(data)
-	}
 }

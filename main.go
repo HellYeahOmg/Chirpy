@@ -24,7 +24,9 @@ func main() {
 	dbQueries := database.New(db)
 
 	sm := http.NewServeMux()
-	config := handlers.ApiConfig{}
+	config := handlers.ApiConfig{
+		DB: dbQueries,
+	}
 
 	s := http.Server{
 		Handler: sm,
@@ -39,15 +41,15 @@ func main() {
 
 	sm.HandleFunc("GET /api/healthz", handlers.HandleHealthz)
 
-	sm.HandleFunc("POST /api/users", handlers.HandleCreateUser(dbQueries))
+	sm.HandleFunc("POST /api/users", config.HandleCreateUser)
 
-	sm.HandleFunc("POST /api/chirps", handlers.HandleCreateChirp(dbQueries))
+	sm.HandleFunc("POST /api/chirps", config.HandleCreateChirp)
 
-	sm.HandleFunc("GET /api/chirps", handlers.HandleGetChirps(dbQueries))
+	sm.HandleFunc("GET /api/chirps", config.HandleGetChirps)
 
-	sm.HandleFunc("GET /api/chirps/{chirpId}", handlers.HandleGetChirp(dbQueries))
+	sm.HandleFunc("GET /api/chirps/{chirpId}", config.HandleGetChirp)
 
-	sm.HandleFunc("POST /api/login", handlers.HandleLogin(dbQueries))
+	sm.HandleFunc("POST /api/login", config.HandleLogin)
 
 	s.ListenAndServe()
 }

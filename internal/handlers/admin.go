@@ -19,5 +19,7 @@ func (cfg *ApiConfig) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *ApiConfig) HandleReset(w http.ResponseWriter, r *http.Request) {
 	cfg.ResetMetricsInc()
+	cfg.DB.Reset(r.Context())
+
 	w.Write([]byte("OK"))
 }

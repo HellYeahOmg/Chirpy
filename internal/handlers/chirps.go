@@ -11,8 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func HandleCreateChirp(dbQueries *database.Queries) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) {
 		type parameters struct {
 			Body   string `json:"body"`
 			UserID string `json:"user_id"`
@@ -75,7 +74,7 @@ func HandleCreateChirp(dbQueries *database.Queries) http.HandlerFunc {
 			UserID:    parsedID,
 		}
 
-		result, err := dbQueries.CreateChirp(r.Context(), newChirp)
+		result, err := cfg.DB.CreateChirp(r.Context(), newChirp)
 		if err != nil {
 			log.Printf("failed to create a new chirp: %s", err)
 			w.WriteHeader(500)
@@ -99,14 +98,12 @@ func HandleCreateChirp(dbQueries *database.Queries) http.HandlerFunc {
 
 		w.WriteHeader(201)
 		w.Write(data)
-	}
 }
 
-func HandleGetChirps(dbQueries *database.Queries) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) HandleGetChirps(w http.ResponseWriter, r *http.Request) {
 		result := []Chirp{}
 
-		rows, err := dbQueries.GetChirps(r.Context())
+		rows, err := cfg.DB.GetChirps(r.Context())
 		if err != nil {
 			log.Printf("failed to get chirps: %s", err)
 			w.WriteHeader(500)
@@ -133,11 +130,9 @@ func HandleGetChirps(dbQueries *database.Queries) http.HandlerFunc {
 
 		w.Write(data)
 		w.WriteHeader(200)
-	}
 }
 
-func HandleGetChirp(dbQueries *database.Queries) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func (cfg *ApiConfig) HandleGetChirp(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("chirpId")
 		parsedID, err := uuid.Parse(id)
 		if err != nil {
@@ -146,7 +141,7 @@ func HandleGetChirp(dbQueries *database.Queries) http.HandlerFunc {
 			return
 		}
 
-		row, err := dbQueries.GetChirp(r.Context(), parsedID)
+		row, err := cfg.DB.GetChirp(r.Context(), parsedID)
 		if err != nil {
 			log.Printf("failed to find a chirp: %s", err)
 			w.WriteHeader(404)
@@ -170,5 +165,4 @@ func HandleGetChirp(dbQueries *database.Queries) http.HandlerFunc {
 
 		w.WriteHeader(200)
 		w.Write(data)
-	}
 }

@@ -3,10 +3,13 @@ package handlers
 import (
 	"net/http"
 	"sync/atomic"
+
+	"github.com/HellYeahOmg/Chirpy/internal/database"
 )
 
 type ApiConfig struct {
 	FileserverHits atomic.Int32
+	DB             *database.Queries
 }
 
 func (cfg *ApiConfig) ResetMetricsInc() {
