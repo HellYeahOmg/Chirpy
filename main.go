@@ -53,5 +53,8 @@ func main() {
 
 	sm.HandleFunc("POST /api/login", config.HandleLogin)
 
+	sm.HandleFunc("POST /api/refresh", config.HandleRefresh)
+	sm.HandleFunc("POST /api/revoke", config.HandleRevoke)
+
 	s.ListenAndServe()
 }

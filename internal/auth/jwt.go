@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -14,12 +16,12 @@ type MyCustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
+func MakeJWT(userID uuid.UUID, tokenSecret string) (string, error) {
 	j := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
 			"iss": "chirpy",
 			"iat": time.Now().Unix(),
-			"exp": time.Now().Add(expiresIn).Unix(),
+			"exp": time.Now().Add(time.Hour).Unix(),
 			"sub": userID.String(),
 		})
 
@@ -61,6 +63,16 @@ func GetBearerToken(headers http.Header) (string, error) {
 	if len(parts) != 2 || parts[0] != "Bearer" || strings.TrimSpace(parts[1]) == "" {
 		return "", errors.New("invalid bearer token has been provided")
 	}
-	
+
 	return parts[1], nil
+}
+
+func MakeRefreshToken() (string, error) {
+	randomBytes := make([]byte, 32)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(randomBytes), nil
 }

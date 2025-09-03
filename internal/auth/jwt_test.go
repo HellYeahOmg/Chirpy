@@ -2,6 +2,7 @@ package auth
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -165,5 +166,59 @@ func TestGetBearerToken_ExtraSpaces(t *testing.T) {
 	expectedMsg := "invalid bearer token has been provided"
 	if err.Error() != expectedMsg {
 		t.Fatalf("Expected error message '%s', got '%s'", expectedMsg, err.Error())
+	}
+}
+
+func TestMakeRefreshToken(t *testing.T) {
+	token, err := MakeRefreshToken()
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if len(token) != 64 {
+		t.Fatalf("Expected token length 64, got %d", len(token))
+	}
+
+	for _, char := range token {
+		if !strings.Contains("0123456789abcdef", strings.ToLower(string(char))) {
+			t.Fatalf("Token contains invalid hex character: %c", char)
+		}
+	}
+}
+
+func TestMakeRefreshToken_Uniqueness(t *testing.T) {
+	token1, err := MakeRefreshToken()
+	if err != nil {
+		t.Fatalf("Expected no error for first token, got %v", err)
+	}
+
+	token2, err := MakeRefreshToken()
+	if err != nil {
+		t.Fatalf("Expected no error for second token, got %v", err)
+	}
+
+	if token1 == token2 {
+		t.Fatal("Expected tokens to be unique, but they were identical")
+	}
+}
+
+func TestMakeRefreshToken_MultipleGenerations(t *testing.T) {
+	tokens := make(map[string]bool)
+	
+	for i := 0; i < 100; i++ {
+		token, err := MakeRefreshToken()
+		if err != nil {
+			t.Fatalf("Expected no error on iteration %d, got %v", i, err)
+		}
+		
+		if len(token) != 64 {
+			t.Fatalf("Expected token length 64 on iteration %d, got %d", i, len(token))
+		}
+		
+		if tokens[token] {
+			t.Fatalf("Duplicate token generated on iteration %d: %s", i, token)
+		}
+		
+		tokens[token] = true
 	}
 }
