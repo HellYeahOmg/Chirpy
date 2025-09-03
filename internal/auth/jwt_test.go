@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -91,5 +92,78 @@ func TestValidateJWT_EmptyToken(t *testing.T) {
 	_, err := ValidateJWT("", secret)
 	if err == nil {
 		t.Fatal("Expected error for empty token, got none")
+	}
+}
+
+func TestGetBearerToken_ValidToken(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer abc123token")
+
+	token, err := GetBearerToken(headers)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if token != "abc123token" {
+		t.Fatalf("Expected token 'abc123token', got '%s'", token)
+	}
+}
+
+func TestGetBearerToken_NoHeader(t *testing.T) {
+	headers := http.Header{}
+
+	_, err := GetBearerToken(headers)
+	if err == nil {
+		t.Fatal("Expected error for missing auth header, got none")
+	}
+
+	expectedMsg := "no auth header has been provided"
+	if err.Error() != expectedMsg {
+		t.Fatalf("Expected error message '%s', got '%s'", expectedMsg, err.Error())
+	}
+}
+
+func TestGetBearerToken_InvalidFormat(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Authorization", "InvalidFormatToken")
+
+	_, err := GetBearerToken(headers)
+	if err == nil {
+		t.Fatal("Expected error for invalid token format, got none")
+	}
+
+	expectedMsg := "invalid bearer token has been provided"
+	if err.Error() != expectedMsg {
+		t.Fatalf("Expected error message '%s', got '%s'", expectedMsg, err.Error())
+	}
+}
+
+func TestGetBearerToken_EmptyToken(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer ")
+
+	_, err := GetBearerToken(headers)
+	if err == nil {
+		t.Fatal("Expected error for empty token, got none")
+	}
+
+	expectedMsg := "invalid bearer token has been provided"
+	if err.Error() != expectedMsg {
+		t.Fatalf("Expected error message '%s', got '%s'", expectedMsg, err.Error())
+	}
+}
+
+func TestGetBearerToken_ExtraSpaces(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer  token_with_spaces")
+
+	_, err := GetBearerToken(headers)
+	if err == nil {
+		t.Fatal("Expected error for malformed token with extra spaces, got none")
+	}
+
+	expectedMsg := "invalid bearer token has been provided"
+	if err.Error() != expectedMsg {
+		t.Fatalf("Expected error message '%s', got '%s'", expectedMsg, err.Error())
 	}
 }

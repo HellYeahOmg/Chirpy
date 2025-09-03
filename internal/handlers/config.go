@@ -10,6 +10,7 @@ import (
 type ApiConfig struct {
 	FileserverHits atomic.Int32
 	DB             *database.Queries
+	JwtSecret      string
 }
 
 func (cfg *ApiConfig) ResetMetricsInc() {
@@ -22,3 +23,4 @@ func (cfg *ApiConfig) MiddlewareMetricsInc(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+

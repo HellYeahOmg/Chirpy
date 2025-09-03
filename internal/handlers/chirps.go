@@ -7,162 +7,167 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/HellYeahOmg/Chirpy/internal/auth"
 	"github.com/HellYeahOmg/Chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
 func (cfg *ApiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) {
-		type parameters struct {
-			Body   string `json:"body"`
-			UserID string `json:"user_id"`
+	type parameters struct {
+		Body string `json:"body"`
+	}
+
+	type errorReturnValues struct {
+		Error string `json:"valid"`
+	}
+
+	params := parameters{}
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		w.WriteHeader(500)
+		responseBody := errorReturnValues{
+			Error: "Something went wrong",
 		}
 
-		type errorReturnValues struct {
-			Error string `json:"valid"`
-		}
-
-		params := parameters{}
-		decoder := json.NewDecoder(r.Body)
-		err := decoder.Decode(&params)
+		dat, err := json.Marshal(responseBody)
 		if err != nil {
-			log.Printf("Error decoding parameters: %s", err)
 			w.WriteHeader(500)
-			responseBody := errorReturnValues{
-				Error: "Something went wrong",
-			}
-
-			dat, err := json.Marshal(responseBody)
-			if err != nil {
-				w.WriteHeader(500)
-				log.Printf("Error marshalling JSON: %s", err)
-				return
-			}
-
-			w.Write(dat)
+			log.Printf("Error marshalling JSON: %s", err)
 			return
 		}
 
-		if len(params.Body) > 140 {
-			w.WriteHeader(400)
-			responseBody := errorReturnValues{
-				Error: "Chirp is too long",
-			}
+		w.Write(dat)
+		return
+	}
 
-			dat, err := json.Marshal(responseBody)
-			if err != nil {
-				w.WriteHeader(500)
-				log.Printf("Error marshalling JSON: %s", err)
-				return
-			}
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
-			w.Write(dat)
-			return
+	id, err := auth.ValidateJWT(token, cfg.JwtSecret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if len(params.Body) > 140 {
+		w.WriteHeader(400)
+		responseBody := errorReturnValues{
+			Error: "Chirp is too long",
 		}
 
-		parsedID, err := uuid.Parse(params.UserID)
+		dat, err := json.Marshal(responseBody)
 		if err != nil {
-			log.Printf("failed to parse user_id: %s", err)
 			w.WriteHeader(500)
+			log.Printf("Error marshalling JSON: %s", err)
 			return
 		}
 
-		newChirp := database.CreateChirpParams{
-			ID:        uuid.New(),
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-			Body:      params.Body,
-			UserID:    parsedID,
-		}
+		w.Write(dat)
+		return
+	}
 
-		result, err := cfg.DB.CreateChirp(r.Context(), newChirp)
-		if err != nil {
-			log.Printf("failed to create a new chirp: %s", err)
-			w.WriteHeader(500)
-			return
-		}
+	newChirp := database.CreateChirpParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Body:      params.Body,
+		UserID:    id,
+	}
 
-		responseBody := Chirp{
-			ID:        result.ID,
-			UpdatedAt: result.UpdatedAt,
-			CreatedAt: result.CreatedAt,
-			Body:      result.Body,
-			UserID:    result.UserID,
-		}
+	result, err := cfg.DB.CreateChirp(r.Context(), newChirp)
+	if err != nil {
+		log.Printf("failed to create a new chirp: %s", err)
+		w.WriteHeader(500)
+		return
+	}
 
-		data, err := json.Marshal(responseBody)
-		if err != nil {
-			log.Printf("failed to marshal chirp: %s", err)
-			w.WriteHeader(500)
-			return
-		}
+	responseBody := Chirp{
+		ID:        result.ID,
+		UpdatedAt: result.UpdatedAt,
+		CreatedAt: result.CreatedAt,
+		Body:      result.Body,
+		UserID:    result.UserID,
+	}
 
-		w.WriteHeader(201)
-		w.Write(data)
+	data, err := json.Marshal(responseBody)
+	if err != nil {
+		log.Printf("failed to marshal chirp: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	w.WriteHeader(201)
+	w.Write(data)
 }
 
 func (cfg *ApiConfig) HandleGetChirps(w http.ResponseWriter, r *http.Request) {
-		result := []Chirp{}
+	result := []Chirp{}
 
-		rows, err := cfg.DB.GetChirps(r.Context())
-		if err != nil {
-			log.Printf("failed to get chirps: %s", err)
-			w.WriteHeader(500)
-			return
+	rows, err := cfg.DB.GetChirps(r.Context())
+	if err != nil {
+		log.Printf("failed to get chirps: %s", err)
+		w.WriteHeader(500)
+		return
+	}
+
+	for _, item := range rows {
+		jsonItem := Chirp{
+			ID:        item.ID,
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: item.UpdatedAt,
+			Body:      item.Body,
+			UserID:    item.UserID,
 		}
+		result = append(result, jsonItem)
+	}
 
-		for _, item := range rows {
-			jsonItem := Chirp{
-				ID:        item.ID,
-				CreatedAt: item.CreatedAt,
-				UpdatedAt: item.UpdatedAt,
-				Body:      item.Body,
-				UserID:    item.UserID,
-			}
-			result = append(result, jsonItem)
-		}
+	data, err := json.Marshal(result)
+	if err != nil {
+		log.Printf("failed to marshal chirps: %s", err)
+		w.WriteHeader(500)
+		return
+	}
 
-		data, err := json.Marshal(result)
-		if err != nil {
-			log.Printf("failed to marshal chirps: %s", err)
-			w.WriteHeader(500)
-			return
-		}
-
-		w.Write(data)
-		w.WriteHeader(200)
+	w.Write(data)
+	w.WriteHeader(200)
 }
 
 func (cfg *ApiConfig) HandleGetChirp(w http.ResponseWriter, r *http.Request) {
-		id := r.PathValue("chirpId")
-		parsedID, err := uuid.Parse(id)
-		if err != nil {
-			log.Printf("failed to parse chirp id: %s", err)
-			w.WriteHeader(500)
-			return
-		}
+	id := r.PathValue("chirpId")
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		log.Printf("failed to parse chirp id: %s", err)
+		w.WriteHeader(500)
+		return
+	}
 
-		row, err := cfg.DB.GetChirp(r.Context(), parsedID)
-		if err != nil {
-			log.Printf("failed to find a chirp: %s", err)
-			w.WriteHeader(404)
-			return
-		}
+	row, err := cfg.DB.GetChirp(r.Context(), parsedID)
+	if err != nil {
+		log.Printf("failed to find a chirp: %s", err)
+		w.WriteHeader(404)
+		return
+	}
 
-		chirp := Chirp{
-			ID:        row.ID,
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
-			UserID:    row.UserID,
-			Body:      row.Body,
-		}
+	chirp := Chirp{
+		ID:        row.ID,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+		UserID:    row.UserID,
+		Body:      row.Body,
+	}
 
-		data, err := json.Marshal(chirp)
-		if err != nil {
-			fmt.Printf("failed to marshal chirp: %s", err)
-			w.WriteHeader(500)
-			return
-		}
+	data, err := json.Marshal(chirp)
+	if err != nil {
+		fmt.Printf("failed to marshal chirp: %s", err)
+		w.WriteHeader(500)
+		return
+	}
 
-		w.WriteHeader(200)
-		w.Write(data)
+	w.WriteHeader(200)
+	w.Write(data)
 }
