@@ -51,10 +51,11 @@ func (cfg *ApiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	responseBody := User{
-		ID:        dbUser.ID,
-		CreatedAt: dbUser.CreatedAt,
-		UpdatedAt: dbUser.UpdatedAt,
-		Email:     dbUser.Email,
+		ID:          dbUser.ID,
+		CreatedAt:   dbUser.CreatedAt,
+		UpdatedAt:   dbUser.UpdatedAt,
+		Email:       dbUser.Email,
+		IsChirpyRed: dbUser.IsChirpyRed.Bool,
 	}
 
 	data, err := json.Marshal(responseBody)
@@ -114,10 +115,11 @@ func (cfg *ApiConfig) HandlerUpdateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	responseBody := User{
-		ID:        dbUser.ID,
-		CreatedAt: dbUser.CreatedAt,
-		UpdatedAt: dbUser.UpdatedAt,
-		Email:     dbUser.Email,
+		ID:          dbUser.ID,
+		CreatedAt:   dbUser.CreatedAt,
+		UpdatedAt:   dbUser.UpdatedAt,
+		Email:       dbUser.Email,
+		IsChirpyRed: dbUser.IsChirpyRed.Bool,
 	}
 
 	data, err := json.Marshal(responseBody)

@@ -57,6 +57,7 @@ func main() {
 	sm.HandleFunc("POST /api/revoke", config.HandleRevoke)
 	sm.HandleFunc("PUT /api/users", config.HandlerUpdateUser)
 	sm.HandleFunc("DELETE /api/chirps/{chirpId}", config.HandleDeleteChirp)
+	sm.HandleFunc("POST /api/polka/webhooks", config.HandlePolkaWebhook)
 
 	s.ListenAndServe()
 }
