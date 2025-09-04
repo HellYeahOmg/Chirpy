@@ -16,6 +16,7 @@ func main() {
 	godotenv.Load(".env")
 	dbURL := os.Getenv("DB_URL")
 	jwtSecret := os.Getenv("JWT_SECRET")
+	polkaKey := os.Getenv("POLKA_KEY")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Printf("failed to open db connection: %s", err)
@@ -28,6 +29,7 @@ func main() {
 	config := handlers.ApiConfig{
 		DB:        dbQueries,
 		JwtSecret: jwtSecret,
+		PolkaKey:  polkaKey,
 	}
 
 	s := http.Server{

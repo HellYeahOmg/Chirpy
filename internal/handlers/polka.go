@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/HellYeahOmg/Chirpy/internal/auth"
 	"github.com/HellYeahOmg/Chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -17,9 +18,20 @@ func (cfg *ApiConfig) HandlePolkaWebhook(w http.ResponseWriter, r *http.Request)
 		} `json:"data"`
 	}
 
+	apiKey, err := auth.GetAPIKey(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	if apiKey != cfg.PolkaKey {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	params := parameters{}
 	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
