@@ -56,6 +56,7 @@ func main() {
 	sm.HandleFunc("POST /api/refresh", config.HandleRefresh)
 	sm.HandleFunc("POST /api/revoke", config.HandleRevoke)
 	sm.HandleFunc("PUT /api/users", config.HandlerUpdateUser)
+	sm.HandleFunc("DELETE /api/chirps/{chirpId}", config.HandleDeleteChirp)
 
 	s.ListenAndServe()
 }

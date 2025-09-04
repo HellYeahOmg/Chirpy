@@ -171,3 +171,42 @@ func (cfg *ApiConfig) HandleGetChirp(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	w.Write(data)
 }
+
+func (cfg *ApiConfig) HandleDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	accessToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(accessToken, cfg.JwtSecret)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	chirpID := r.PathValue("chirpId")
+	parsedChirpID, err := uuid.Parse(chirpID)
+	if err != nil {
+		w.WriteHeader(http.StatusPaymentRequired)
+	}
+
+	row, err := cfg.DB.GetChirp(r.Context(), parsedChirpID)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	if row.UserID != userID {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	err = cfg.DB.DeleteChirp(r.Context(), row.ID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
