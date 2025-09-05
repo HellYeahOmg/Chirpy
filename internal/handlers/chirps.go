@@ -106,9 +106,22 @@ func (cfg *ApiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) 
 }
 
 func (cfg *ApiConfig) HandleGetChirps(w http.ResponseWriter, r *http.Request) {
+	authorID := r.URL.Query().Get("author_id")
 	result := []Chirp{}
 
-	rows, err := cfg.DB.GetChirps(r.Context())
+	var parsedAuthorID uuid.UUID
+	var err error
+
+	if authorID != "" {
+		parsedAuthorID, err = uuid.Parse(authorID)
+		if err != nil {
+			log.Printf("failed to parse author_id: %s", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	rows, err := cfg.DB.GetChirps(r.Context(), parsedAuthorID)
 	if err != nil {
 		log.Printf("failed to get chirps: %s", err)
 		w.WriteHeader(500)

@@ -1,3 +1,4 @@
 -- name: GetChirps :many
-select * from chirps
-order by created_at ASC;
+SELECT * FROM chirps 
+WHERE ($1::uuid IS NULL OR user_id = $1)
+ORDER BY created_at ASC;
